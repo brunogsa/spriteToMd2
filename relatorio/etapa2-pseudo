@@ -1,0 +1,15 @@
+para cada keyframe armazenado no fim da etapa 1:
+    encontre o arquivo que contém sua representação;
+
+    para cada voxel na matriz tridimensional que o representa:
+        
+        se o valor 1 é encontrado:
+            armazene um espaço vazio no arquivo md2;
+
+        caso contrário:
+            gere 1 cubo visível para representar o voxel;
+
+gere o binário do arquivo md2;
+fim da etapa 2;
+
+

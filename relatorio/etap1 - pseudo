@@ -1,0 +1,16 @@
+para cada animação:
+
+    procure um sprite no formato PNG;
+    verifique que ele possui 6 frames em cada coluna;
+    verifique que ele possui uma quantidade inteira de frames em cada linha;
+
+    armazene a quantidade de frames em cada linha em um arquivo;
+    atualize o número total de frames do modelo final;
+
+    gere uma representação intermediária do keyframe, esculpindo o sprite;
+    armazene em um arquivo essa representação;
+
+armazene o número total de frames em um arquivo;
+fim da etapa 1;
+
+
