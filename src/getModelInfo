@@ -1,0 +1,185 @@
+#! octave-interpreter-name -qf
+
+# =============================================
+# FUNCTIONS
+# =============================================
+
+function dataOfLine = getListFromNextLine( contentOfFile )
+    dataOfLine = strtrim( strsplit( strsplit( fgetl(contentOfFile), "=" ){2}, "," ) );
+endfunction
+
+function dataOfLine = getValueFromNextLine( contentOfFile )
+    dataOfLine = str2double( strtrim( strsplit( strsplit( fgetl(contentOfFile), "=" ){2}, "," ) ){1} );
+endfunction
+
+function subImg = getSubImage(img, startX, endX, startY, endY)
+    subImgSideX = endX - startX + 1;
+    subImgSideY = endY - startY + 1;
+    subImg = zeros( subImgSideY, subImgSideX );
+
+    x = 1;
+    for i = startX : endX
+
+        y = 1;
+        for j = startY : endY
+
+            subImg(y, x) = img(j, i);
+            y++;
+        endfor
+
+        x++;
+    endfor
+endfunction
+
+function imgAlpha = getAlphaFromImg(img)
+    imgAlpha = img(:, :, 4);
+endfunction
+
+function saveTotalNumberOfFramesInFile( info, pathToRootDir )
+    pathToSave = strcat( pathToRootDir, "totalNumberOfFrames.in" );
+    dlmwrite( pathToSave, info, "-append" );
+endfunction
+
+function saveNumberOfFramesInFile( info, pathToRootDir, animationName )
+    pathToSave = strcat( pathToRootDir, animationName, "NumberOfFrames.in" );
+    dlmwrite( pathToSave, info, "-append" );
+endfunction
+
+function saveMeshIntoFile( mesh, pathToSave )
+    meshSide = rows(mesh);
+
+    for z = 1 : meshSide
+        dlmwrite( pathToSave, mesh(:, :, z), "-append" );
+    endfor
+endfunction
+
+function newMesh = doOtimizations( oldMesh )
+    # TODO
+    newMesh = oldMesh;
+endfunction
+
+function saveFramesDataInFiles( pathToRootDir, animationName, img, frameSide, numberOfFramesInThisAnimation )
+    img = getAlphaFromImg(img);
+
+    for f = 1 : numberOfFramesInThisAnimation
+        mesh = ones( frameSide, frameSide, frameSide );
+
+        startXOfFront =  (f-1) * frameSide + 1;
+        endXOfFront = f * frameSide;
+        startXOfLeft =  (f-1) * frameSide + 1;
+        endXOfLeft = f * frameSide;
+        startXOfTop =  (f-1) * frameSide + 1;
+        endXOfTop = f * frameSide;
+
+        startYOfFront = 2 * frameSide + 1;
+        endYOfFront = 3 * frameSide;
+        startYOfLeft = 5 * frameSide + 1;
+        endYOfLeft = 6 * frameSide;
+        startYOfTop = frameSide + 1;
+        endYOfTop = 2 * frameSide;
+
+        frontAlpha = getSubImage(img, startXOfFront, endXOfFront, startYOfFront, endYOfFront);
+        leftAlpha = getSubImage(img, startXOfLeft, endXOfLeft, startYOfLeft, endYOfLeft);
+        topAlpha = getSubImage(img, startXOfTop, endXOfTop, startYOfTop, endYOfTop);
+
+        # Front cut
+        for z = 1 : frameSide
+            mesh(:, :, z) = mesh(:, :, z) & frontAlpha;
+        endfor
+
+        # Left cut
+        for x = 1 : frameSide
+            for y = 1 : frameSide
+
+                z = frameSide;
+                while ( z > 0 )
+
+                    transparencyOfAlpha = leftAlpha( y , frameSide - z + 1 );
+                    valueOnMesh = mesh(y, x, z);
+                    finalValueOnMesh = valueOnMesh | transparencyOfAlpha;
+
+                    mesh(y, x, z) = finalValueOnMesh;
+                    z--;
+                endwhile
+
+            endfor
+        endfor
+
+        # Top cut
+        for y = 1 : frameSide
+            for z = 1 : frameSide
+
+                x = frameSide;
+                while ( x > 0 )
+
+                    transparencyOfAlpha = topAlpha( frameSide - z + 1 , x );
+                    valueOnMesh = mesh(y, x, z);
+                    finalValueOnMesh = valueOnMesh | transparencyOfAlpha;
+
+                    mesh(y, x, z) = finalValueOnMesh;
+                    x--;
+                endwhile
+
+            endfor
+        endfor
+
+        mesh = doOtimizations( mesh );
+
+        pathToSave = strcat( pathToRootDir, animationName, "Frame", int2str(f), ".in" );
+        saveMeshIntoFile( mesh, pathToSave );
+    endfor
+endfunction
+
+# =============================================
+# SCRIPT
+# =============================================
+
+# Input
+
+arg_list = argv();
+
+numberOfInputs = size( arg_list )(1);
+if (numberOfInputs != 1)
+    printf( "Error on getModelInfo: no arguments given!\n" );
+    return;
+endif
+
+pathToRootDir = strcat( arg_list{1}, "/" );
+
+# Script begin
+pathToRootConfigFile = strcat( pathToRootDir, "config" );
+contentOfRootConfigFile = fopen( pathToRootConfigFile );
+
+frameSide = getValueFromNextLine( contentOfRootConfigFile );
+animations = getListFromNextLine( contentOfRootConfigFile );
+
+numberOfAnimations = size(animations)(2);
+totalNumberOfFrames = 0;
+
+for i = 1 : numberOfAnimations
+
+    animation = animations{i};
+    imgName = strcat( animation, ".png" );
+    pathToAnimationSheet = strcat( pathToRootDir, imgName );
+
+    img = imread(pathToAnimationSheet);
+
+    sheetLength = columns(img);
+    sheetHeight = rows(img);
+
+    if ( sheetHeight != 6 * frameSide || rem( sheetLength, frameSide ) != 0 )
+        errorMsg = strcat( "Aborting.. You must have a integer number of frames in animation '", animation, "'!\n" ); 
+        printf(errorMsg);
+        return;
+    endif
+
+    numberOfFramesInThisAnimation = int32( sheetLength / frameSide );
+    totalNumberOfFrames = totalNumberOfFrames + numberOfFramesInThisAnimation;
+
+    saveNumberOfFramesInFile( numberOfFramesInThisAnimation, pathToRootDir, animation );
+    saveFramesDataInFiles( pathToRootDir, animation, img, frameSide, numberOfFramesInThisAnimation );
+endfor
+
+saveTotalNumberOfFramesInFile( totalNumberOfFrames, pathToRootDir );
+
+# =============================================
